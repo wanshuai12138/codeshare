@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <style>
+        html, body {
+            margin: 0;
+        }
+
+        #app {
+            /*max-width: 800px;*/
+            margin: 30px;
+        }
+
+        .item-box {
+            user-select: none;
+            display: flex;
+            flex-wrap: wrap;
+        }
+
+        .active, .inactive, .active2, .active3 {
+            width: 70px;
+            height: 35px;
+            margin: 5px;
+            font-size: 13px;
+            font-weight: 600;
+            padding: 5px;
+            text-align: center;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all .3s;
+            animation: scale-up-tl .4s cubic-bezier(.39, .575, .565, 1.000) both;
+        }
+
+        .active {
+            background: #edf5fe;
+            color: #519dfb;
+        }
+
+        .active2 {
+            background: #edf5fe;
+            color: red;
+        }
+
+        .active3 {
+            background: #edf5fe;
+            color: blue;
+        }
+
+        .inactive {
+            background: #fcf6ed;
+            color: #e9b74a;
+        }
+
+        .line {
+            font-size: 14px;
+            font-weight: 600;
+            background: #f3f4f5;
+            padding: 5px 1rem;
+            border-radius: 3px;
+            transition: all .2s;
+            padding-left: 1.5rem
+        }
+
+        .line:hover {
+            padding-left: 1.5rem
+        }
+
+        @keyframes scale-up-tl {
+            0% {
+                transform: scale(0.5);
+                transform-origin: 0 0;
+            }
+            100% {
+                transform: scale(1);
+                transform-origin: 0 0;
+            }
+        }
+
+        .n .el-card__body {
+            padding: 0 25px;
+        }
+
+        .n .el-divider--horizontal {
+            margin: 0 auto;
+            width: 23px;
+            height: 2px;
+            background: #FFCC99;
+        }
+    </style>
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+<script src="https://cdn.staticfile.org/jquery/1.10.2/jquery.min.js"></script>
+<script src="axios.min.js"></script>
+<script src="vue.js"></script>
+<script src="index.js"></script>
+<div id='app'>
+    <el-tabs type="border-card">
+        <el-tab-pane label="正向推理">
+            <el-row>
+                <el-col :span="8">
+                    <el-card style="margin: 10px;">
+                        <el-row>
+                            <el-input v-model="input" placeholder="请输入内容" style="width: 50%"></el-input>
+                            <el-button type="primary" @click="add1">添加</el-button>
+                            <el-button type="primary" @click="starttui">开始推</el-button>
+                        </el-row>
+                        <el-row>
+                            <el-card style="margin: 20px 0 0 0;">
+                                <el-divider content-position="left">综合数据库</el-divider>
+                                <el-scrollbar style="height: 100px">
+                                    <el-tag
+                                            v-for="item in items"
+                                            closable
+                                            @close="handleClose(item)"
+                                    >
+                                        {{ item }}
+                                    </el-tag>
+                                </el-scrollbar>
+                            </el-card>
+                        </el-row>
+                        <el-row>
+                            <el-card style="margin: 20px 0 0 0;">
+
+                                <el-divider content-position="left">推理过程</el-divider>
+                                <el-scrollbar style="height: 200px">
+                                    <el-card v-for="line in process" class="n">
+                                        <p>{{ line }} </p>
+                                    </el-card>
+                                </el-scrollbar>
+                            </el-card>
+                        </el-row>
+                    </el-card>
+                </el-col>
+                <el-col :span="8">
+                    <el-card style="margin: 10px;">
+                        <el-row>
+                            <el-button type="success" @click="dialogVisible = true">添加规则</el-button>
+                            <el-button @click="init" style="float: right">重新选择</el-button>
+                        </el-row>
+                        <el-row>
+                            <div class="item-box" style="padding: 25px;">
+                                <div v-for="(item, ind) in features" :key="ind"
+                                     :class="computeClass(ind)"
+                                     @click="activate(ind)" class="n"> {{ ind }}
+                                    <el-divider></el-divider>
+                                    {{ item }}
+                                </div>
+                                <div class="inactive" @click="addConcept" style="background: #f1f8ec;color: #7bbd49;">
+                                    添加
+                                </div>
+                            </div>
+                        </el-row>
+                    </el-card>
+                </el-col>
+                <el-col :span="8">
+                    <el-card style="margin: 10px;">
+                        <el-row>
+                            <el-input v-model="new_rule" placeholder="序号m,序号n....=序号g"
+                                      style="width: 90%; padding: 10px;">
+                                <el-button @click="addNewRule" slot="append">添加规则</el-button>
+                            </el-input>
+                        </el-row>
+                        <el-row>
+                            <div>
+                                <el-collapse v-model="activeNames" @change="handleChange">
+                                    <el-collapse-item title="推理规则" name="1">
+                                        <el-scrollbar style="height: 470px">
+                                            <el-card v-for="(items,index) in rules">
+                                                <table style="width: 100%">
+                                                    <tr>
+                                                        <td>
+                                                            <el-tag v-for="item in items.conditions">
+                                                                {{features[item]}}
+                                                            </el-tag>
+                                                        </td>
+                                                        <td style="float: right">
+                                                            <el-button @click="delete1(index,items)">删除</el-button>
+                                                        </td>
+                                                        <!--                                                        <td style="float: right">-->
+                                                        <!--                                                            <el-button @click="new1(index,items)">修改</el-button>-->
+                                                        <!--                                                        </td>-->
+                                                        <td style="float: right">
+                                                            <el-tag type='success'>{{features[items.conclusion]}}
+                                                            </el-tag>
+                                                        </td>
+                                                    </tr>
+                                                </table>
+                                            </el-card>
+                                        </el-scrollbar>
+                                    </el-collapse-item>
+                                    <el-collapse-item title="中间结论" name="2">
+                                        <el-scrollbar style="height: 470px">
+                                            <div class="item-box" style="padding: 28px;">
+                                                <div v-for="(item,index) in end"
+                                                     class="active"
+                                                     v-if="result[item]&&flagn[index]==1"
+                                                     style="background: #7bbd49;color: white;height: 45px">
+                                                    {{ features[item] }}<br>( {{ item}} )
+                                                </div>
+                                                <!--                                    <el-tag v-for="item in end">{{features[item]}}</el-tag>-->
+                                            </div>
+                                        </el-scrollbar>
+                                    </el-collapse-item>
+                                    <el-collapse-item title="结论" name="3">
+                                        <el-scrollbar style="height: 470px">
+                                            <div class="item-box" style="padding: 28px;">
+                                                <div v-for="(item,index) in end"
+                                                     class="active"
+                                                     v-if="result[item]&&flagn[index]==2"
+                                                     style="background: #7bbd49;color: white;height: 45px">
+                                                    {{ features[item] }}<br>( {{ item}} )
+                                                </div>
+                                                <!--                                    <el-tag v-for="item in end">{{features[item]}}</el-tag>-->
+                                            </div>
+                                        </el-scrollbar>
+                                    </el-collapse-item>
+                                </el-collapse>
+                            </div>
+                        </el-row>
+                    </el-card>
+                </el-col>
+            </el-row>
+            <el-dialog
+                    title="提示"
+                    :visible.sync="dialogVisible"
+                    width="70%"
+                    :before-close="handleClose1">
+                <div>
+                    <el-row>
+                        <el-col :span="12">
+                            推理
+                            <el-input style="width: 75%" v-model="input1"></el-input>
+                            <el-button @click="add2">添加</el-button>
+                            <div>
+                                <el-tag v-for="i in tui1"
+                                        closable
+                                        @close="handleCloset(i)">{{i}}
+                                </el-tag>
+                            </div>
+                        </el-col>
+                        <el-col :span="12">
+                            结论
+                            <el-input style="width: 75%" v-model="input2"></el-input>
+                            <el-button @click="add3">添加</el-button>
+                            <div>
+                                <el-tag v-for="i in cen1"
+                                        closable
+                                        @close="handleClosec(i)">{{i}}
+                                </el-tag>
+                            </div>
+                        </el-col>
+                    </el-row>
+                </div>
+                <el-button @click="dialogVisible = false">取 消</el-button>
+                <el-button type="primary" @click="tuiandend">确 定</el-button>
+                </span>
+            </el-dialog>
+        </el-tab-pane>
+        <el-tab-pane label="反向推理">
+            <el-row>
+                <el-col :span="12">
+                    <el-input v-model="input3">
+                    </el-input>
+                    <el-select v-model="value" placeholder="请选择">
+                        <el-option
+                                v-for="(item,index) in end"
+                                v-if="flagn[index]==2"
+                                :key="item"
+                                :label="features[item]"
+                                :value="item">
+                        </el-option>
+                    </el-select>
+                    <el-button @click="tianjia">
+                        添加
+                    </el-button>
+                    <el-button @click="fanxiang">
+                        反推
+                    </el-button>
+                    <el-divider content-position="left">输入的初始数据库</el-divider>
+                    <el-tag v-for="item in zhanshi">{{item}}</el-tag>
+                    <el-card v-for="line in nixiang" class="n">
+                        <p>{{ line }} </p>
+                    </el-card>
+                </el-col>
+                <el-col :span="12">
+                    <el-collapse v-model="activeNames" @change="handleChange">
+                        <el-collapse-item title="推理规则" name="1">
+                            <el-scrollbar style="height: 470px">
+                                <el-card v-for="items in rules">
+                                    <table style="width: 100%">
+                                        <tr>
+                                            <td>
+                                                <el-tag v-for="item in items.conditions">
+                                                    {{features[item]}}
+                                                </el-tag>
+                                            </td>
+                                            <td style="float: right">
+                                                <el-tag type='success'>{{features[items.conclusion]}}
+                                                </el-tag>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </el-card>
+                            </el-scrollbar>
+                        </el-collapse-item>
+                    </el-collapse>
+                </el-col>
+            </el-row>
+
+        </el-tab-pane>
+    </el-tabs>
+</div>
+<script>
+    var a = new Vue({
+        el: '#app',
+        data() {
+            return {
+                value: '',
+                features: ["有毛", "产奶", "有羽毛", "会飞", "会下蛋", "吃肉", "有犬齿", "有爪", "眼睛盯前方", "有蹄", "反刍", "黄褐色", "有斑点", "有黑色条纹", "长脖", "长腿", "不会飞", "会游泳", "黑白两色", "善飞", "哺乳类", "鸟类", "肉食类", "蹄类", "企鹅", "海燕", "鸵鸟", "斑马", "长颈鹿", "虎", "金钱豹"],
+                result: [],
+                new_rule: '',
+                rules: [
+                    {
+                        conditions: [0],
+                        conclusion: 20,
+                        flag: 1
+                    }, {
+                        conditions: [1],
+                        conclusion: 20,
+                        flag: 1
+                    }, {
+                        conditions: [2],
+                        conclusion: 21,
+                        flag: 1
+                    }, {
+                        conditions: [3, 4],
+                        conclusion: 21,
+                        flag: 1
+                    }, {
+                        conditions: [20, 5],
+                        conclusion: 22,
+                        flag: 1
+                    }, {
+                        conditions: [6, 7, 8],
+                        conclusion: 22,
+                        flag: 1
+                    }, {
+                        conditions: [20, 8],
+                        conclusion: 23,
+                        flag: 1
+                    }, {
+                        conditions: [20, 9],
+                        conclusion: 23,
+                        flag: 1
+                    }, {
+                        conditions: [21, 17, 18, 16],
+                        conclusion: 24,
+                        flag: 2
+                    }, {
+                        conditions: [21, 19],
+                        conclusion: 25,
+                        flag: 2
+                    }, {
+                        conditions: [21, 14, 15, 16],
+                        conclusion: 26,
+                        flag: 2
+                    }, {
+                        conditions: [23, 13],
+                        conclusion: 27,
+                        flag: 2
+                    }, {
+                        conditions: [23, 14, 15, 12],
+                        conclusion: 28,
+                        flag: 2
+                    }, {
+                        conditions: [22, 11, 13],
+                        conclusion: 29,
+                        flag: 2
+                    }, {
+                        conditions: [22, 11, 12],
+                        conclusion: 30,
+                        flag: 2
+                    }],
+                process: [],
+                input: '',
+                input1: "",
+                input2: "",
+                input3: "",
+                items: [],
+                activeNames: ["3"],
+                tui1: [],
+                cen1: [],
+                newitem: {
+                    conditions: [],
+                    conclusion: '',
+                    flag: ""
+                },
+                end: [],
+                dialogVisible: false,
+                nixiang: [],
+                nituiku: [],
+                zhanshi: [],
+                flagn: []
+            }
+        },
+        methods: {
+            delete1(index, item) {
+                this.rules.splice(index, 1)
+                this.init()
+            },
+
+            // new1(index, item) {
+            //     console.log(item)
+            //     this.cen1=[]
+            //     this.tui=[]
+            //     for (let itemElement of item.conditions) {
+            //         this.tui1.push(this.features[itemElement])
+            //     }
+            //     this.cen1.push(this.features[item.conclusion])
+            //     console.log(this.cen1)
+            //     this.dialogVisible=true
+            //     this.delete1(index,item)
+            // },
+            tianjia() {
+                this.nituiku.push(this.features.indexOf(this.input3))
+                this.zhanshi.push(this.input3)
+                this.input3 = ""
+            },
+            fanxiang() {
+                this.nixiang = []
+                var n = [];
+                for (let i = this.rules.length - 1; i >= 8; i--) {
+                    if (this.rules[i].conclusion === this.value) {
+                        n = this.rules[i].conditions
+                        break
+                    }
+                }
+                this.nixiang.push("假设为" + this.features[this.value])
+                var a = this.digui(n)
+                if (a === "n") {
+                    this.nixiang.push("不为" + this.features[this.value])
+                }
+                if (a === "y") {
+                    this.nixiang.push("为" + this.features[this.value])
+                }
+                console.log(this.nixiang)
+                this.nituiku = []
+            },
+            digui(a) {
+                console.log(a)
+                for (let i = 0; i < a.length; i++) {
+                    if (this.nituiku.indexOf(a[i]) !== -1) {
+                        this.nixiang.push("条件" + this.features[a[i]] + "匹配成功")
+                    } else {
+                        if (this.end.indexOf(a[i]) !== -1) {
+                            console.log(a[i])
+                            var n = 0;
+                            for (let j = 0; j < this.rules.length; j++) {
+                                if (this.rules[j].conclusion === a[i]) {
+                                    console.log(a[i])
+                                    n = j;
+                                    break
+                                }
+                            }
+                            this.nixiang.push("条件" + this.features[a[i]] + "可扩展，进行扩展")
+                            console.log(a[i])
+                            c = this.digui(this.rules[n].conditions)
+                            if (c === "n") {
+                                return "n"
+                            }
+                        } else {
+                            this.nixiang.push("条件" + this.features[a[i]] + "匹配失败")
+                            return "n"
+                        }
+                    }
+                }
+                return "y"
+            },
+            tuiandend() {
+                for (let i = 0; i < this.tui1.length; i++) {
+                    this.newitem.conditions.push(this.features.length + i)
+                }
+                console.log(this.cen1)
+                this.newitem.conclusion = this.features.length + this.tui1.length
+                this.newitem.flag = 2
+                this.features = this.features.concat(this.tui1.concat(this.cen1))
+                this.insertRule(this.newitem, this.rules)
+                this.tui1 = []
+                this.cen1 = []
+                this.dialogVisible = false
+                this.init() // 初始化 result 为空
+                this.$message('添加成功')
+            },
+            handleClose1(done) {
+                this.$confirm('确认关闭？')
+                    .then(_ => {
+                        done();
+                    })
+                    .catch(_ => {
+                    });
+            },
+            add2() {
+                this.tui1.push(this.input1)
+                this.input1 = ""
+            },
+            add3() {
+                if (this.cen1.length >= 1) {
+                    a.$message({
+                        message: '只允许添加一个结论',
+                        type: 'success'
+                    });
+                } else {
+                    this.cen1.push(this.input2)
+                }
+                this.input2 = ""
+            },
+            handleClose(tag) {
+                this.result[this.features.indexOf(tag)] = false
+                this.items.splice(this.items.indexOf(tag), 1);
+            },
+            handleCloset(tag) {
+                console.log(tag)
+                this.tui1.splice(this.tui1.indexOf(tag), 1);
+            },
+            handleClosec(tag) {
+                this.cen1.splice(this.cen1.indexOf(tag), 1);
+            },
+            handleChange(val) {
+                console.log(val);
+            },
+            add1() {
+                if (this.items.indexOf(this.input) === -1) {
+                    this.items.push(this.input)
+                }
+                this.input = ""
+            },
+            starttui() {
+                for (var itemElement of this.items) {
+                    n = this.features.indexOf(itemElement)
+                    this.activate(n)
+                }
+            },
+            init() {
+                this.result = Array(this.features.length).fill(false)
+                this.new_rule = ''
+                this.end = []
+                this.flagn = []
+                this.items = []
+                this.process = []
+                for (var rule of this.rules) {
+                    if (this.end.indexOf(rule.conclusion) === -1) {
+                        this.end.push(rule.conclusion)
+                        this.flagn.push(rule.flag)
+                    }
+                }
+            },
+            activate(ind) {
+                if (ind >= 0) {
+                    this.result[ind] = true;
+                }
+                if (this.items.indexOf(this.features[ind]) === -1 && ind >= 0) {
+                    this.items.push(this.features[ind])
+                }
+                const reducer = (accumulator, currentValue) => accumulator && this.result[currentValue];
+                const reduce_word = (accumulator, currentValue) => accumulator + this.features[currentValue] + '且';
+                this.process = []
+                n = 0;
+                for (var item of this.rules) {
+                    if (item.conditions.reduce(reducer, true)) {
+                        n = 1
+                        const word = item.conditions.reduce(reduce_word, '因为').slice(0, -1)
+                        if (this.items.indexOf(this.features[item.conclusion]) === -1) {
+                            this.items.push(this.features[item.conclusion])
+                        }
+                        this.process.push(word + ', 所以可推导得' + this.features[item.conclusion])
+                        this.result[item.conclusion] = item.conditions.reduce(reducer, true)
+                        if (item.flag === 2) {
+                            this.$confirm('推出' + this.features[item.conclusion], '推理已完成，是否重新开始', {
+                                confirmButtonText: '重新开始',
+                                cancelButtonText: '返回',
+                                type: 'success'
+                            }).then(() => {
+                                this.$message({
+                                    type: 'success',
+                                    message: '数据清除，重新开始'
+                                });
+                                this.init()
+                            }).catch(() => {
+                            });
+                        } else {
+                            this.$confirm("未推得最终结果，推得中间结论:" + this.features[item.conclusion] + ",是否继续？", '推理结束', {
+                                confirmButtonText: '确定',
+                                cancelButtonText: '终止',
+                                type: 'warning'
+                            }).then(() => {
+                                this.$message({
+                                    type: 'success',
+                                    message: '请继续输入条件!'
+                                });
+                            }).catch(() => {
+                                this.$message({
+                                    type: 'info',
+                                    message: '程序结束，数据清空',
+                                });
+                                this.init()
+                            });
+                        }
+                    }
+                }
+                if (n === 0) {
+                    this.$confirm("未推得最终结果，是否继续？", '推理结束', {
+                        confirmButtonText: '确定',
+                        cancelButtonText: '终止',
+                        type: 'warning'
+                    }).then(() => {
+                        this.$message({
+                            type: 'success',
+                            message: '请继续输入条件!'
+                        });
+                    }).catch(() => {
+                        this.$message({
+                            type: 'info',
+                            message: '程序结束，数据清空',
+                        });
+                        this.init()
+                    });
+                }
+            },
+            addConcept() {
+                this.$prompt('请输入名称（1-5字）', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                }).then(({value}) => {
+                    if (value && value.length > 0 && value.length <= 5) {
+                        this.features.push(value)
+                    } else {
+                        this.$message.error('输入长度有误')
+                    }
+                })
+            },
+            // 添加新的规则
+            addNewRule() {
+                // 对输入进行正则匹配
+                const pattern = /^[0-9]+(,[0-9]*)*=[0-9]+$/
+                if (!pattern.test(this.new_rule)) {
+                    this.$message.error('格式有误')
+                    return
+                }
+                // 对输入的字符串进行分割处理 1,3>10
+                const div = this.new_rule.indexOf('=')
+                const conclusion = eval(this.new_rule.slice(div + 1))
+                const conditions = this.new_rule.slice(0, div).split(',').map(item => eval(item))
+                // 对数据可行性进行判断
+                if (conclusion >= this.features.length || Math.max(...conditions) >= this.features.length) {
+                    return this.$message.error('超出范围')
+                } else {
+                    const new_rule = {
+                        conditions: conditions,
+                        conclusion: conclusion,
+                        flag: 2
+                    };
+                    this.rules = this.insertRule(new_rule, this.rules)
+                    this.init() // 初始化 result 为空
+                    this.$message('添加成功')
+                }
+            },
+            // 对规则进行插入排序
+            // sortRules() {
+            //     let rulesArray = [];
+            //     for(var item of this.rules) {
+            //         rulesArray = this.insertRule(item, rulesArray);
+            //     }
+            //     console.log(rulesArray)
+            //     return rulesArray
+            // },
+            // 向已有的规则中插入一条新的规则
+            insertRule(rule, rulesArray, index) {
+                if (rulesArray && rulesArray.length === 0) {
+                    rulesArray.push(rule)
+                    return rulesArray
+                } else {
+                    const times = rulesArray.length
+                    for (var i = 0; i < times; i++) {
+                        // 如果该规则的推导结果会作为另外一个规则的条件的话，就放在那个规则的前面；否则放在最后一个；
+                        // console.log(rulesArray[i].conditions, rule.conclusion)
+                        if (rulesArray[i].conditions.includes(rule.conclusion)) {
+                            rulesArray.splice(i, 0, rule)
+                            break
+                        }
+                    }
+                    if (rulesArray.length === times) {
+                        rulesArray.push(rule)
+                    }
+                    return rulesArray
+                }
+            },
+            computeClass(ind) {
+                if (this.result[ind]) {
+                    return 'active'
+                } else if (this.end.indexOf(ind) !== -1) {
+                    if (this.flagn[this.end.indexOf(ind)] === 2) {
+                        return 'active2'
+                    } else if (this.flagn[this.end.indexOf(ind)] === 1) {
+                        return 'active3'
+                    }
+                }
+                return 'inactive'
+            }
+        },
+        mounted() {
+            this.init();
+        },
+    })
+</script>
+</body>
+</html>
